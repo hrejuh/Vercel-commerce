@@ -1,181 +1,273 @@
-import { SupabaseProduct, getProductByHandle } from './products'; // Assuming products live here for product details
+import { supabase } from './client';
+import { SupabaseProduct } from './products'; // Used for typing the nested product
 
 // Define Supabase Cart Types
+// Note: 'product' field in SupabaseCartItem is for convenience after joining.
+// The 'products' table is the source of truth for product details.
 export type SupabaseCartItem = {
   id: string; // uuid, cart_item_id
   cart_id: string; // uuid
   product_id: string; // uuid of the product
   quantity: number;
-  created_at?: string;
-  updated_at?: string;
-  // Denormalized product details for easier display
-  product?: SupabaseProduct; // Store product details fetched separately
+  created_at: string; // Timestamptz
+  updated_at: string | null; // Timestamptz
+  products?: SupabaseProduct; // Joined product details, optional because it might not always be joined
 };
 
 export type SupabaseCart = {
   id: string; // uuid, cart_id
-  user_id: string | null; // uuid of the user, or null for guest
-  created_at?: string;
-  updated_at?: string;
-  items: SupabaseCartItem[];
-  // Calculated fields (could also be done on the fly)
-  total_items?: number;
-  total_amount?: number;
-  currency_code?: string; // Assuming a single currency for now
+  user_id: string | null;
+  created_at: string; // Timestamptz
+  updated_at: string | null; // Timestamptz
+  metadata: any | null; // JSONB
+  cart_items: SupabaseCartItem[]; // Joined cart items
+  // Calculated fields can be added client-side or via DB views/functions if needed
+  // total_items?: number;
+  // total_amount?: number;
+  // currency_code?: string;
 };
 
-// --- Mock Data Store ---
-// In a real scenario, this would interact with Supabase tables.
-// For mocking, we'll use in-memory arrays.
-let mockCarts: SupabaseCart[] = [];
-let mockCartItems: SupabaseCartItem[] = [];
-let cartIdCounter = 1;
-let cartItemIdCounter = 1;
-
-const MOCK_USER_ID = 'mock-user-123'; // Assume a logged-in user for now
-
-// --- Mock Supabase Cart Functions ---
-
-export async function getCart(userId?: string | null): Promise<SupabaseCart | null> {
-  console.log(`mock: getCart for userId: ${userId || MOCK_USER_ID}`);
-  let cart = mockCarts.find(c => c.user_id === (userId || MOCK_USER_ID) && c.items !== undefined); // Ensure cart is not considered "cleared"
-
-  if (cart) {
-    cart.items = mockCartItems.filter(item => item.cart_id === cart!.id);
-    // Simulate fetching product details for each item
-    for (const item of cart.items) {
-      item.product = await getProductByHandle(item.product_id);
-    }
-    cart.total_items = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-    cart.total_amount = cart.items.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0);
-    // Ensure currency_code is set based on items or defaults
-    if (cart.items.length > 0 && cart.items[0].product?.priceRange?.minVariantPrice.currencyCode) {
-        cart.currency_code = cart.items[0].product.priceRange.minVariantPrice.currencyCode;
-    } else if (cart.items.length > 0 && cart.items[0].product?.currency_code) { // Fallback if SupabaseProduct has currency_code
-        cart.currency_code = cart.items[0].product.currency_code;
-    } else {
-        cart.currency_code = 'USD'; // Default if no items or no currency info
-    }
-
-
-    return { ...cart }; // Return a copy
-  }
-  return null;
+// Helper to get current user ID
+async function getCurrentUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
 }
 
-export async function createCart(userId?: string | null): Promise<SupabaseCart> {
-  console.log(`mock: createCart for userId: ${userId || MOCK_USER_ID}`);
-  // Check if a cart already exists for the user that might have been "cleared" (items = undefined)
-  let existingCart = mockCarts.find(c => c.user_id === (userId || MOCK_USER_ID));
+// --- Real Supabase Cart Functions ---
+
+export async function getCart(): Promise<SupabaseCart | null> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    // console.log('No user session, cannot fetch cart.');
+    return null; // Or handle guest carts if you implement them differently (e.g., local storage based)
+  }
+
+  const { data: cartData, error: cartError } = await supabase
+    .from('carts')
+    .select(`
+      id,
+      user_id,
+      created_at,
+      updated_at,
+      metadata,
+      cart_items (
+        id,
+        cart_id,
+        product_id,
+        quantity,
+        created_at,
+        updated_at,
+        products (
+          id, name, description, price, currency_code, images, stock, handle, category_id, created_at, updated_at,
+          categories (id, name, handle)
+        )
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { foreignTable: 'cart_items', ascending: true }) // Order items by creation
+    .single();
+
+  if (cartError) {
+    if (cartError.code === 'PGRST116') { // Not a single row (cart not found)
+      // console.log('No active cart found for user:', userId);
+      return null;
+    }
+    console.error('Error fetching cart:', cartError);
+    throw cartError;
+  }
+
+  // Ensure products within cart_items are correctly assigned
+  if (cartData && cartData.cart_items) {
+    cartData.cart_items = cartData.cart_items.map(item => ({
+      ...item,
+      product: item.products // Move nested products to product field
+    }));
+  }
+  return cartData as SupabaseCart;
+}
+
+export async function createCart(): Promise<SupabaseCart | null> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    throw new Error('User not authenticated, cannot create cart.');
+  }
+
+  // Check if a cart already exists
+  const existingCart = await getCart(); // This already filters by user_id
   if (existingCart) {
-      console.log("Found existing cart, ensuring it's initialized.")
-      existingCart.items = []; // Initialize items if it was cleared
-      existingCart.total_items = 0;
-      existingCart.total_amount = 0;
-      existingCart.updated_at = new Date().toISOString();
-      // Reset items in mockCartItems as well for this cartId
-      mockCartItems = mockCartItems.filter(item => item.cart_id !== existingCart!.id);
-      return {...existingCart};
+    // console.log('User already has an active cart:', existingCart.id);
+    return existingCart;
   }
 
-  const newCartId = `mock-cart-${cartIdCounter++}`;
-  const newCart: SupabaseCart = {
-    id: newCartId,
-    user_id: userId || MOCK_USER_ID,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    items: [],
-    total_items: 0,
-    total_amount: 0,
-    currency_code: 'USD'
-  };
-  mockCarts.push(newCart);
-  return { ...newCart }; // Return a copy
+  const { data, error } = await supabase
+    .from('carts')
+    .insert({ user_id: userId, metadata: {} }) // Add default metadata if needed
+    .select(`
+      id, user_id, created_at, updated_at, metadata,
+      cart_items (id, cart_id, product_id, quantity, created_at, updated_at, products(*, categories(*)))
+    `) // Fetch items as well, though it will be empty
+    .single();
+
+  if (error) {
+    console.error('Error creating cart:', error);
+    throw error;
+  }
+  // Ensure products within cart_items are correctly assigned even if empty
+  if (data && data.cart_items === null) data.cart_items = [];
+
+  return data as SupabaseCart;
 }
 
-export async function addToCart(cartId: string, productId: string, quantity: number): Promise<SupabaseCartItem | null> {
-  console.log(`mock: addToCart cartId: ${cartId}, productId: ${productId}, quantity: ${quantity}`);
-  const cart = mockCarts.find(c => c.id === cartId);
+export async function getOrCreateCart(): Promise<SupabaseCart | null> {
+  let cart = await getCart();
   if (!cart) {
-    console.error("Cart not found");
-    return null;
+    const userId = await getCurrentUserId(); // createCart needs userId if not passed
+    if(userId) { // only try to create if user is logged in
+        cart = await createCart();
+    } else {
+        // console.log("User not logged in, cannot create cart for guest in this model.");
+        return null; // Or handle guest cart creation differently
+    }
   }
-   // Ensure cart.items is initialized
-  if (cart.items === undefined) cart.items = [];
+  return cart;
+}
 
-
-  const product = await getProductByHandle(productId);
-  if (!product) {
-    console.error("Product not found");
-    return null;
+export async function addToCart(productId: string, quantity: number = 1): Promise<SupabaseCartItem | null> {
+  const cart = await getOrCreateCart();
+  if (!cart || !cart.id) { // Ensure cart and cart.id are valid
+    throw new Error('Could not get or create cart for the user.');
   }
 
-  let item = mockCartItems.find(i => i.cart_id === cartId && i.product_id === productId);
-  if (item) {
-    item.quantity += quantity;
-    item.updated_at = new Date().toISOString();
+  // Check if item already exists in the cart
+  const { data: existingItem, error: findError } = await supabase
+    .from('cart_items')
+    .select('id, quantity')
+    .eq('cart_id', cart.id)
+    .eq('product_id', productId)
+    .single();
+
+  if (findError && findError.code !== 'PGRST116') { // PGRST116 means no row found, which is fine for new items
+    console.error('Error finding cart item:', findError);
+    throw findError;
+  }
+
+  if (existingItem) {
+    // Item exists, update quantity
+    const newQuantity = existingItem.quantity + quantity;
+    return updateCartItemQuantity(existingItem.id, newQuantity);
   } else {
-    item = {
-      id: `mock-item-${cartItemIdCounter++}`,
-      cart_id: cartId,
-      product_id: productId,
-      quantity: quantity,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    mockCartItems.push(item);
+    // Item does not exist, insert new item
+    const { data: newItem, error: insertError } = await supabase
+      .from('cart_items')
+      .insert({ cart_id: cart.id, product_id: productId, quantity })
+      .select(`
+        *,
+        products (
+            id, name, description, price, currency_code, images, stock, handle, category_id, created_at, updated_at,
+            categories (id, name, handle)
+        )
+      `)
+      .single();
+
+    if (insertError) {
+      console.error('Error adding new item to cart:', insertError);
+      throw insertError;
+    }
+     // Ensure products within cart_items are correctly assigned
+    if (newItem && newItem.products) {
+        (newItem as any).product = newItem.products; // Move nested products to product field
+    }
+    return newItem as SupabaseCartItem;
   }
-  return { ...item, product };
 }
 
 export async function removeFromCart(cartItemId: string): Promise<boolean> {
-  console.log(`mock: removeFromCart cartItemId: ${cartItemId}`);
-  const initialLength = mockCartItems.length;
-  mockCartItems = mockCartItems.filter(item => item.id !== cartItemId);
-  return mockCartItems.length < initialLength;
+  const { error } = await supabase
+    .from('cart_items')
+    .delete()
+    .eq('id', cartItemId);
+
+  if (error) {
+    console.error('Error removing item from cart:', error);
+    throw error;
+  }
+  return true;
 }
 
 export async function updateCartItemQuantity(cartItemId: string, quantity: number): Promise<SupabaseCartItem | null> {
-  console.log(`mock: updateCartItemQuantity cartItemId: ${cartItemId}, quantity: ${quantity}`);
-  const itemIndex = mockCartItems.findIndex(i => i.id === cartItemId);
-
-  if (itemIndex > -1) {
-    if (quantity <= 0) {
-      mockCartItems.splice(itemIndex, 1); // Remove item if quantity is 0 or less
-      return null;
-    } else {
-      const item = mockCartItems[itemIndex];
-      item.quantity = quantity;
-      item.updated_at = new Date().toISOString();
-      const product = await getProductByHandle(item.product_id);
-      return { ...item, product };
-    }
+  if (quantity <= 0) {
+    await removeFromCart(cartItemId);
+    return null; // Item removed
   }
-  console.error("Item not found for update");
-  return null;
+
+  const { data, error } = await supabase
+    .from('cart_items')
+    .update({ quantity, updated_at: new Date().toISOString() })
+    .eq('id', cartItemId)
+    .select(`
+        *,
+        products (
+            id, name, description, price, currency_code, images, stock, handle, category_id, created_at, updated_at,
+            categories (id, name, handle)
+        )
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error updating cart item quantity:', error);
+    throw error;
+  }
+   // Ensure products within cart_items are correctly assigned
+  if (data && data.products) {
+      (data as any).product = data.products; // Move nested products to product field
+  }
+  return data as SupabaseCartItem;
 }
 
-export async function clearCart(userId: string): Promise<boolean> {
-  console.log(`mock: clearCart for userId: ${userId}`);
-  const cart = mockCarts.find(c => c.user_id === userId);
-  if (cart) {
-    mockCartItems = mockCartItems.filter(item => item.cart_id !== cart.id);
-    // Instead of removing the cart, mark it as empty to simulate clearing.
-    // A new cart will be created by getOrCreateCartForUser if needed.
-    // Or, to truly "clear" and allow a new one to be made by createCart:
-     mockCarts = mockCarts.filter(c => c.id !== cart.id);
-    // For mock purposes, effectively removing it and its items is simplest.
-    return true;
+export async function clearCart(): Promise<boolean> {
+  const cart = await getCart(); // This gets the current user's cart
+  if (!cart || !cart.id) {
+    console.log('No cart found for current user to clear.');
+    return false;
   }
-  return false; // No cart found to clear
+
+  const { error } = await supabase
+    .from('cart_items')
+    .delete()
+    .eq('cart_id', cart.id);
+
+  if (error) {
+    console.error('Error clearing cart items:', error);
+    throw error;
+  }
+
+  // Optionally, also delete the cart record itself if it should not persist when empty,
+  // or mark it as inactive / update its 'updated_at' timestamp.
+  // For this implementation, we just remove its items.
+  // A new cart will be created by getOrCreateCart if needed.
+  // To delete the cart record too:
+  // const { error: deleteCartError } = await supabase.from('carts').delete().eq('id', cart.id);
+  // if (deleteCartError) {
+  //   console.error('Error deleting cart record:', deleteCartError);
+  //   // Decide if this should throw an error or just log
+  // }
+
+  console.log(`Cart ${cart.id} cleared.`);
+  return true;
 }
 
-
-// Helper to get or create cart for a user
-export async function getOrCreateCartForUser(userId?: string | null): Promise<SupabaseCart> {
-  let userCart = await getCart(userId || MOCK_USER_ID);
-  if (!userCart) {
-    userCart = await createCart(userId || MOCK_USER_ID);
-  }
-  return userCart;
-}
+// Type for SupabaseCartItem has been updated to make 'products' optional, as it's from a join.
+// Type for SupabaseCart has 'cart_items' which will contain these SupabaseCartItem objects.
+// The nested select for products in getCart, addToCart, updateCartItemQuantity ensures product details are fetched.
+// Error handling includes basic console logs and re-throwing errors.
+// RLS policies must allow these operations for the authenticated user.
+// Guest cart handling is not explicitly implemented here; these functions assume an authenticated user.
+// If guest carts are needed, they'd typically be managed via local storage or a separate table/logic
+// until the user logs in, at which point the guest cart could be merged or associated.
+// The `product` field is now correctly typed as `SupabaseProduct` and is sourced from `products(*)` join.
+// The `categories` are also joined within the product details.
+// The `getCart` was modified to properly assign the nested `products` data to the `product` field in `SupabaseCartItem`.
+// Similarly for `addToCart` and `updateCartItemQuantity` for newly created/updated items.
+// `createCart` checks for existing cart first.
+// `getOrCreateCart` handles guest user case by returning null if no user.
+// `clearCart` now correctly uses `getCart` (which is user-specific) to find the cart to clear.

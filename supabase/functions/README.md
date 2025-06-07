@@ -125,15 +125,16 @@ Supabase Edge Functions are typically deployed using the Supabase CLI.
 3.  **Deploy a specific function**:
     Each Edge Function resides in its own directory within `supabase/functions/`. To deploy a function, navigate to your Supabase project directory in the terminal and run:
     ```bash
-    supabase functions deploy <function_name>
+    supabase functions deploy <function_name> --project-ref <your-project-ref>
     ```
+    Replace `<your-project-ref>` with your actual Supabase project reference ID.
     For example, to deploy the `create-order` function:
     ```bash
-    supabase functions deploy create-order
+    supabase functions deploy create-order --project-ref <your-project-ref>
     ```
 
 4.  **Deploy all functions**:
-    You can deploy all functions by omitting the function name:
+    You can deploy all functions by omitting the function name (ensure you are linked or provide `--project-ref`):
     ```bash
     supabase functions deploy
     ```
