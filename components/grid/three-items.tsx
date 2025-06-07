@@ -1,6 +1,7 @@
 import { GridTileImage } from 'components/grid/tile';
-import { getCollectionProducts } from 'lib/shopify';
-import type { Product } from 'lib/shopify/types';
+// import { getCollectionProducts } from 'lib/shopify'; // Shopify import
+// import type { Product } from 'lib/shopify/types'; // Shopify type
+import { getAllProducts, SupabaseProduct } from 'lib/supabase/products'; // Supabase import
 import Link from 'next/link';
 
 function ThreeItemGridItem({
@@ -8,7 +9,7 @@ function ThreeItemGridItem({
   size,
   priority
 }: {
-  item: Product;
+  item: SupabaseProduct; // Use SupabaseProduct type
   size: 'full' | 'half';
   priority?: boolean;
 }) {
@@ -22,18 +23,20 @@ function ThreeItemGridItem({
         prefetch={true}
       >
         <GridTileImage
-          src={item.featuredImage.url}
+          // Ensure featuredImage exists on SupabaseProduct or provide fallback
+          src={item.featuredImage?.url || ''}
           fill
           sizes={
             size === 'full' ? '(min-width: 768px) 66vw, 100vw' : '(min-width: 768px) 33vw, 100vw'
           }
           priority={priority}
-          alt={item.title}
+          alt={item.name} // Use name from SupabaseProduct
           label={{
             position: size === 'full' ? 'center' : 'bottom',
-            title: item.title as string,
-            amount: item.priceRange.maxVariantPrice.amount,
-            currencyCode: item.priceRange.maxVariantPrice.currencyCode
+            title: item.name, // Use name from SupabaseProduct
+            // Ensure priceRange exists or fallback to product.price
+            amount: item.priceRange?.maxVariantPrice?.amount || item.price.toString(),
+            currencyCode: item.priceRange?.maxVariantPrice?.currencyCode || 'USD'
           }}
         />
       </Link>
@@ -42,14 +45,14 @@ function ThreeItemGridItem({
 }
 
 export async function ThreeItemGrid() {
-  // Collections that start with `hidden-*` are hidden from the search page.
-  const homepageItems = await getCollectionProducts({
-    collection: 'hidden-homepage-featured-items'
-  });
+  // Fetch products from Supabase
+  // For now, using getAllProducts and taking the first three.
+  // This could be a more specific function like getFeaturedProducts() in a real scenario.
+  const products = await getAllProducts();
 
-  if (!homepageItems[0] || !homepageItems[1] || !homepageItems[2]) return null;
+  if (!products || products.length < 3) return null;
 
-  const [firstProduct, secondProduct, thirdProduct] = homepageItems;
+  const [firstProduct, secondProduct, thirdProduct] = products.slice(0,3);
 
   return (
     <section className="mx-auto grid max-w-(--breakpoint-2xl) gap-4 px-4 pb-4 md:grid-cols-6 md:grid-rows-2 lg:max-h-[calc(100vh-200px)]">

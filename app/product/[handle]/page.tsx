@@ -6,9 +6,10 @@ import Footer from 'components/layout/footer';
 import { Gallery } from 'components/product/gallery';
 import { ProductProvider } from 'components/product/product-context';
 import { ProductDescription } from 'components/product/product-description';
-import { HIDDEN_PRODUCT_TAG } from 'lib/constants';
-import { getProduct, getProductRecommendations } from 'lib/shopify';
-import { Image } from 'lib/shopify/types';
+import { HIDDEN_PRODUCT_TAG } from 'lib/constants'; // May remove if not applicable to Supabase products
+// import { getProduct, getProductRecommendations } from 'lib/shopify'; // Shopify import
+import { getProductByHandle, getRelatedProducts, SupabaseProduct } from 'lib/supabase/products'; // Supabase import
+// import { Image } from 'lib/shopify/types'; // Shopify type
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -16,12 +17,13 @@ export async function generateMetadata(props: {
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const params = await props.params;
-  const product = await getProduct(params.handle);
+  const product = await getProductByHandle(params.handle); // Use Supabase function
 
   if (!product) return notFound();
 
-  const { url, width, height, altText: alt } = product.featuredImage || {};
-  const indexable = !product.tags.includes(HIDDEN_PRODUCT_TAG);
+  // Adjust for SupabaseProduct structure if necessary. Assuming featuredImage and tags exist for now.
+  const { url, width, height, alt } = product.featuredImage || { url: '', width: 0, height: 0, alt: '' };
+  const indexable = product.tags ? !product.tags.includes(HIDDEN_PRODUCT_TAG) : true;
 
   return {
     title: product.seo.title || product.title,
@@ -50,8 +52,16 @@ export async function generateMetadata(props: {
 }
 
 export default async function ProductPage(props: { params: Promise<{ handle: string }> }) {
+  // Data for this specific product page.
+  // Revalidation should occur if this product's details change.
+  // This can be done via:
+  // 1. Time-based revalidation (e.g., revalidate: 3600 in page config or layout).
+  // 2. On-demand revalidation by specific product handle/ID or a general 'products' tag:
+  //    - `revalidatePath('/product/[handle]')` - for specific product path
+  //    - `revalidateTag('products')` or `revalidateTag('product-[id]')` - if using tags with Supabase fetch
+  //    This would typically be called after an admin updates product details.
   const params = await props.params;
-  const product = await getProduct(params.handle);
+  const product = await getProductByHandle(params.handle); // Use Supabase function
 
   if (!product) return notFound();
 
@@ -60,15 +70,16 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
     '@type': 'Product',
     name: product.title,
     description: product.description,
-    image: product.featuredImage.url,
+    // Ensure featuredImage and priceRange exist on SupabaseProduct, or handle potential undefined
+    image: product.featuredImage?.url || '',
     offers: {
       '@type': 'AggregateOffer',
       availability: product.availableForSale
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
-      priceCurrency: product.priceRange.minVariantPrice.currencyCode,
-      highPrice: product.priceRange.maxVariantPrice.amount,
-      lowPrice: product.priceRange.minVariantPrice.amount
+      priceCurrency: product.priceRange?.minVariantPrice?.currencyCode || 'USD',
+      highPrice: product.priceRange?.maxVariantPrice?.amount || product.price.toString(),
+      lowPrice: product.priceRange?.minVariantPrice?.amount || product.price.toString()
     }
   };
 
@@ -89,9 +100,9 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
               }
             >
               <Gallery
-                images={product.images.slice(0, 5).map((image: Image) => ({
+                images={product.images.slice(0, 5).map((image: { url: string; alt?: string }) => ({ // Use Supabase image type
                   src: image.url,
-                  altText: image.altText
+                  altText: image.alt || product.name // Provide a fallback alt text
                 }))}
               />
             </Suspense>
@@ -99,10 +110,12 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
 
           <div className="basis-full lg:basis-2/6">
             <Suspense fallback={null}>
-              <ProductDescription product={product} />
+              {/* Ensure ProductDescription can handle SupabaseProduct type */}
+              <ProductDescription product={product as any} />
             </Suspense>
           </div>
         </div>
+        {/* Use product.id for related products, ensure it's the correct ID type */}
         <RelatedProducts id={product.id} />
       </div>
       <Footer />
@@ -111,7 +124,7 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
 }
 
 async function RelatedProducts({ id }: { id: string }) {
-  const relatedProducts = await getProductRecommendations(id);
+  const relatedProducts = await getRelatedProducts(id); // Use Supabase function
 
   if (!relatedProducts.length) return null;
 
@@ -132,9 +145,9 @@ async function RelatedProducts({ id }: { id: string }) {
               <GridTileImage
                 alt={product.title}
                 label={{
-                  title: product.title,
-                  amount: product.priceRange.maxVariantPrice.amount,
-                  currencyCode: product.priceRange.maxVariantPrice.currencyCode
+                  title: product.name, // Use name from SupabaseProduct
+                  amount: product.priceRange?.maxVariantPrice?.amount || product.price.toString(),
+                  currencyCode: product.priceRange?.maxVariantPrice?.currencyCode || 'USD'
                 }}
                 src={product.featuredImage?.url}
                 fill

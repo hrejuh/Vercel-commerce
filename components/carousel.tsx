@@ -1,10 +1,12 @@
-import { getCollectionProducts } from 'lib/shopify';
+// import { getCollectionProducts } from 'lib/shopify'; // Shopify import
+import { getAllProducts, SupabaseProduct } from 'lib/supabase/products'; // Supabase import
 import Link from 'next/link';
 import { GridTileImage } from './grid/tile';
 
 export async function Carousel() {
-  // Collections that start with `hidden-*` are hidden from the search page.
-  const products = await getCollectionProducts({ collection: 'hidden-homepage-carousel' });
+  // Fetch products from Supabase.
+  // Using getAllProducts for now. This could be a specific function like getCarouselProducts().
+  const products = await getAllProducts();
 
   if (!products?.length) return null;
 
@@ -21,13 +23,15 @@ export async function Carousel() {
           >
             <Link href={`/product/${product.handle}`} className="relative h-full w-full">
               <GridTileImage
-                alt={product.title}
+                alt={product.name} // Use name from SupabaseProduct
                 label={{
-                  title: product.title,
-                  amount: product.priceRange.maxVariantPrice.amount,
-                  currencyCode: product.priceRange.maxVariantPrice.currencyCode
+                  title: product.name, // Use name from SupabaseProduct
+                  // Ensure priceRange exists or fallback to product.price
+                  amount: product.priceRange?.maxVariantPrice?.amount || product.price.toString(),
+                  currencyCode: product.priceRange?.maxVariantPrice?.currencyCode || 'USD'
                 }}
-                src={product.featuredImage?.url}
+                // Ensure featuredImage exists or provide fallback
+                src={product.featuredImage?.url || ''}
                 fill
                 sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
               />

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import MobileMenu from './mobile-menu';
 import Search, { SearchSkeleton } from './search';
+import UserAuthNav from './UserAuthNav'; // Import the new component
 
 const { SITE_NAME } = process.env;
 
@@ -52,8 +53,13 @@ export async function Navbar() {
             <Search />
           </Suspense>
         </div>
-        <div className="flex justify-end md:w-1/3">
-          <CartModal />
+        <div className="flex justify-end md:w-1/3 items-center"> {/* Added items-center */}
+          <Suspense fallback={<div className="h-8 w-24 animate-pulse rounded bg-gray-200" />}>
+            <UserAuthNav />
+          </Suspense>
+          <div className="ml-4"> {/* Add margin to separate UserAuthNav from CartModal */}
+            <CartModal />
+          </div>
         </div>
       </div>
     </nav>

@@ -3,7 +3,8 @@
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { updateItemQuantity } from 'components/cart/actions';
-import type { CartItem } from 'lib/shopify/types';
+// import type { CartItem } from 'lib/shopify/types'; // Shopify type
+import type { SupabaseCartItem } from '@/lib/supabase/cart'; // Supabase type (ensure path is correct)
 import { useActionState } from 'react';
 
 function SubmitButton({ type }: { type: 'plus' | 'minus' }) {
@@ -34,13 +35,15 @@ export function EditItemQuantityButton({
   type,
   optimisticUpdate
 }: {
-  item: CartItem;
+  item: SupabaseCartItem; // Use SupabaseCartItem type
   type: 'plus' | 'minus';
-  optimisticUpdate: any;
+  optimisticUpdate: any; // This function will need to be aware of SupabaseCartItem structure
 }) {
   const [message, formAction] = useActionState(updateItemQuantity, null);
+  // The updateItemQuantity action now expects { cartItemId, quantity }
+  // SupabaseCartItem has an 'id' field which is the cart_item_id.
   const payload = {
-    merchandiseId: item.merchandise.id,
+    cartItemId: item.id,
     quantity: type === 'plus' ? item.quantity + 1 : item.quantity - 1
   };
   const updateItemQuantityAction = formAction.bind(null, payload);
@@ -48,8 +51,9 @@ export function EditItemQuantityButton({
   return (
     <form
       action={async () => {
-        optimisticUpdate(payload.merchandiseId, type);
-        updateItemQuantityAction();
+        // Ensure optimisticUpdate can handle cartItemId or the SupabaseCartItem structure and type ('plus'/'minus')
+        optimisticUpdate(item.id, type, payload.quantity);
+        await updateItemQuantityAction();
       }}
     >
       <SubmitButton type={type} />

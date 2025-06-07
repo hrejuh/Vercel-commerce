@@ -50,10 +50,10 @@ import {
   ShopifyMenuOperation,
   ShopifyPageOperation,
   ShopifyPagesOperation,
-  ShopifyProduct,
-  ShopifyProductOperation,
-  ShopifyProductRecommendationsOperation,
-  ShopifyProductsOperation,
+  ShopifyProduct, // Will be unused if all product functions are removed
+  ShopifyProductOperation, // Will be unused
+  ShopifyProductRecommendationsOperation, // Will be unused
+  ShopifyProductsOperation, // Will be unused
   ShopifyRemoveFromCartOperation,
   ShopifyUpdateCartOperation
 } from './types';
@@ -181,36 +181,71 @@ const reshapeProduct = (
   product: ShopifyProduct,
   filterHiddenProducts: boolean = true
 ) => {
-  if (
-    !product ||
-    (filterHiddenProducts && product.tags.includes(HIDDEN_PRODUCT_TAG))
-  ) {
-    return undefined;
-  }
+//   if (
+//     !product ||
+//     (filterHiddenProducts && product.tags.includes(HIDDEN_PRODUCT_TAG))
+//   ) {
+//     return undefined;
+//   }
 
-  const { images, variants, ...rest } = product;
+//   const { images, variants, ...rest } = product;
 
-  return {
-    ...rest,
-    images: reshapeImages(images, product.title),
-    variants: removeEdgesAndNodes(variants)
-  };
-};
+//   return {
+//     ...rest,
+//     images: reshapeImages(images, product.title),
+//     variants: removeEdgesAndNodes(variants)
+//   };
+// };
 
-const reshapeProducts = (products: ShopifyProduct[]) => {
-  const reshapedProducts = [];
+// const reshapeProducts = (products: ShopifyProduct[]) => {
+//   const reshapedProducts = [];
 
-  for (const product of products) {
-    if (product) {
-      const reshapedProduct = reshapeProduct(product);
+//   for (const product of products) {
+//     if (product) {
+//       const reshapedProduct = reshapeProduct(product);
 
-      if (reshapedProduct) {
-        reshapedProducts.push(reshapedProduct);
-      }
-    }
-  }
+//       if (reshapedProduct) {
+//         reshapedProducts.push(reshapedProduct);
+//       }
+//     }
+//   }
 
-  return reshapedProducts;
+//   return reshapedProducts;
+// };
+
+// --- Product Specific Functions (Commented out as migrating to Supabase) ---
+
+// export async function getCollectionProducts({
+//   collection,
+//   reverse,
+//   sortKey
+// }: {
+//   collection: string;
+//   reverse?: boolean;
+//   sortKey?: string;
+// }): Promise<Product[]> {
+//   'use cache';
+//   cacheTag(TAGS.collections, TAGS.products);
+//   cacheLife('days');
+
+//   const res = await shopifyFetch<ShopifyCollectionProductsOperation>({
+//     query: getCollectionProductsQuery,
+//     variables: {
+//       handle: collection,
+//       reverse,
+//       sortKey: sortKey === 'CREATED_AT' ? 'CREATED' : sortKey
+//     }
+//   });
+
+//   if (!res.body.data.collection) {
+//     console.log(`No collection found for \`${collection}\``);
+//     return [];
+//   }
+
+//   return reshapeProducts(
+//     removeEdgesAndNodes(res.body.data.collection.products)
+//   );
+// }
 };
 
 export async function createCart(): Promise<Cart> {
@@ -310,27 +345,7 @@ export async function getCollectionProducts({
   sortKey?: string;
 }): Promise<Product[]> {
   'use cache';
-  cacheTag(TAGS.collections, TAGS.products);
-  cacheLife('days');
-
-  const res = await shopifyFetch<ShopifyCollectionProductsOperation>({
-    query: getCollectionProductsQuery,
-    variables: {
-      handle: collection,
-      reverse,
-      sortKey: sortKey === 'CREATED_AT' ? 'CREATED' : sortKey
-    }
-  });
-
-  if (!res.body.data.collection) {
-    console.log(`No collection found for \`${collection}\``);
-    return [];
-  }
-
-  return reshapeProducts(
-    removeEdgesAndNodes(res.body.data.collection.products)
-  );
-}
+// --- End of Product Specific Functions ---
 
 export async function getCollections(): Promise<Collection[]> {
   'use cache';
@@ -403,64 +418,65 @@ export async function getPages(): Promise<Page[]> {
   return removeEdgesAndNodes(res.body.data.pages);
 }
 
-export async function getProduct(handle: string): Promise<Product | undefined> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('days');
+// export async function getProduct(handle: string): Promise<Product | undefined> {
+//   'use cache';
+//   cacheTag(TAGS.products);
+//   cacheLife('days');
 
-  const res = await shopifyFetch<ShopifyProductOperation>({
-    query: getProductQuery,
-    variables: {
-      handle
-    }
-  });
+//   const res = await shopifyFetch<ShopifyProductOperation>({
+//     query: getProductQuery,
+//     variables: {
+//       handle
+//     }
+//   });
 
-  return reshapeProduct(res.body.data.product, false);
-}
+//   return reshapeProduct(res.body.data.product, false);
+// }
 
-export async function getProductRecommendations(
-  productId: string
-): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('days');
+// export async function getProductRecommendations(
+//   productId: string
+// ): Promise<Product[]> {
+//   'use cache';
+//   cacheTag(TAGS.products);
+//   cacheLife('days');
 
-  const res = await shopifyFetch<ShopifyProductRecommendationsOperation>({
-    query: getProductRecommendationsQuery,
-    variables: {
-      productId
-    }
-  });
+//   const res = await shopifyFetch<ShopifyProductRecommendationsOperation>({
+//     query: getProductRecommendationsQuery,
+//     variables: {
+//       productId
+//     }
+//   });
 
-  return reshapeProducts(res.body.data.productRecommendations);
-}
+//   return reshapeProducts(res.body.data.productRecommendations);
+// }
 
-export async function getProducts({
-  query,
-  reverse,
-  sortKey
-}: {
-  query?: string;
-  reverse?: boolean;
-  sortKey?: string;
-}): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('days');
+// export async function getProducts({
+//   query,
+//   reverse,
+//   sortKey
+// }: {
+//   query?: string;
+//   reverse?: boolean;
+//   sortKey?: string;
+// }): Promise<Product[]> {
+//   'use cache';
+//   cacheTag(TAGS.products);
+//   cacheLife('days');
 
-  const res = await shopifyFetch<ShopifyProductsOperation>({
-    query: getProductsQuery,
-    variables: {
-      query,
-      reverse,
-      sortKey
-    }
-  });
+//   const res = await shopifyFetch<ShopifyProductsOperation>({
+//     query: getProductsQuery,
+//     variables: {
+//       query,
+//       reverse,
+//       sortKey
+//     }
+//   });
 
-  return reshapeProducts(removeEdgesAndNodes(res.body.data.products));
-}
+//   return reshapeProducts(removeEdgesAndNodes(res.body.data.products));
+// }
 
 // This is called from `app/api/revalidate.ts` so providers can control revalidation logic.
+// Product related revalidation logic might need to be adjusted for Supabase.
 export async function revalidate(req: NextRequest): Promise<NextResponse> {
   // We always need to respond with a 200 status code to Shopify,
   // otherwise it will continue to retry the request.
@@ -469,22 +485,23 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
     'collections/delete',
     'collections/update'
   ];
-  const productWebhooks = [
-    'products/create',
-    'products/delete',
-    'products/update'
-  ];
+  // const productWebhooks = [
+  //   'products/create',
+  //   'products/delete',
+  //   'products/update'
+  // ];
   const topic = (await headers()).get('x-shopify-topic') || 'unknown';
   const secret = req.nextUrl.searchParams.get('secret');
   const isCollectionUpdate = collectionWebhooks.includes(topic);
-  const isProductUpdate = productWebhooks.includes(topic);
+  // const isProductUpdate = productWebhooks.includes(topic); // Product webhooks no longer relevant here
 
   if (!secret || secret !== process.env.SHOPIFY_REVALIDATION_SECRET) {
     console.error('Invalid revalidation secret.');
     return NextResponse.json({ status: 401 });
   }
 
-  if (!isCollectionUpdate && !isProductUpdate) {
+  // if (!isCollectionUpdate && !isProductUpdate) { // Adjusted condition
+  if (!isCollectionUpdate) { // Only check for collection updates now
     // We don't need to revalidate anything for any other topics.
     return NextResponse.json({ status: 200 });
   }
@@ -493,9 +510,9 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
     revalidateTag(TAGS.collections);
   }
 
-  if (isProductUpdate) {
-    revalidateTag(TAGS.products);
-  }
+  // if (isProductUpdate) { // Product revalidation no longer relevant here
+  //   revalidateTag(TAGS.products);
+  // }
 
   return NextResponse.json({ status: 200, revalidated: true, now: Date.now() });
 }

@@ -1,32 +1,36 @@
-import productFragment from '../fragments/product';
+// import productFragment from '../fragments/product';
 
-export const getProductQuery = /* GraphQL */ `
-  query getProduct($handle: String!) {
-    product(handle: $handle) {
-      ...product
-    }
-  }
-  ${productFragment}
-`;
+// export const getProductQuery = /* GraphQL */ `
+//   query getProduct($handle: String!) {
+//     product(handle: $handle) {
+//       ...product
+//     }
+//   }
+//   ${productFragment}
+// `;
 
-export const getProductsQuery = /* GraphQL */ `
-  query getProducts($sortKey: ProductSortKeys, $reverse: Boolean, $query: String) {
-    products(sortKey: $sortKey, reverse: $reverse, query: $query, first: 100) {
-      edges {
-        node {
-          ...product
-        }
-      }
-    }
-  }
-  ${productFragment}
-`;
+// export const getProductsQuery = /* GraphQL */ `
+//   query getProducts($sortKey: ProductSortKeys, $reverse: Boolean, $query: String) {
+//     products(sortKey: $sortKey, reverse: $reverse, query: $query, first: 100) {
+//       edges {
+//         node {
+//           ...product
+//         }
+//       }
+//     }
+//   }
+//   ${productFragment}
+// `;
 
-export const getProductRecommendationsQuery = /* GraphQL */ `
-  query getProductRecommendations($productId: ID!) {
-    productRecommendations(productId: $productId) {
-      ...product
-    }
-  }
-  ${productFragment}
-`;
+// export const getProductRecommendationsQuery = /* GraphQL */ `
+//   query getProductRecommendations($productId: ID!) {
+//     productRecommendations(productId: $productId) {
+//       ...product
+//     }
+//   }
+//   ${productFragment}
+// `;
+
+// Product related GraphQL queries are removed as we are migrating to Supabase.
+// The corresponding data fetching will be handled by functions in lib/supabase/products.ts
+export {}; // Add an empty export to ensure the file is treated as a module if all content is commented.

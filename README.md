@@ -73,3 +73,54 @@ Your app should now be running on [localhost:3000](http://localhost:3000/).
 ## Vercel, Next.js Commerce, and Shopify Integration Guide
 
 You can use this comprehensive [integration guide](https://vercel.com/docs/integrations/ecommerce/shopify) with step-by-step instructions on how to configure Shopify as a headless CMS using Next.js Commerce as your headless Shopify storefront on Vercel.
+
+---
+
+## Deployment
+
+This section provides guidance on deploying the application, which has been conceptually migrated to use Supabase for its backend.
+
+### Recommended Hosting
+
+-   **Vercel**: Excellent integration with Next.js. Supports environment variables, custom domains, and automatic deployments from Git. The `vercel.json` file in this repository provides a basic configuration.
+-   **Netlify**: Another popular platform for deploying Next.js applications with similar features to Vercel.
+-   **Other Node.js Hosting**: Any platform that can run a Node.js application can host a Next.js app, though serverless-specific features of Next.js might require more configuration.
+
+### Environment Variables
+
+The following environment variables are essential for a production deployment connected to Supabase:
+
+-   `NEXT_PUBLIC_SUPABASE_URL`: The public URL for your Supabase project.
+-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: The public anonymous key for your Supabase project.
+-   `SUPABASE_SERVICE_ROLE_KEY`: The secret service role key for your Supabase project. This is required for administrative tasks or operations that need to bypass RLS, typically within Supabase Edge Functions or secure server-side processes. **Never expose this key on the client-side.**
+-   `RAZORPAY_KEY_ID` (Example): Your Razorpay Key ID, to be used by Supabase Edge Functions for payment processing.
+-   `RAZORPAY_KEY_SECRET` (Example): Your Razorpay Key Secret, used for server-side verification in Supabase Edge Functions.
+-   `JWT_SECRET` (or similar, if custom): If your Supabase project uses a custom JWT secret for Supabase Auth, ensure this is configured in your deployment environment for Edge Functions that verify JWTs. (Supabase handles JWTs by default, this is for custom setups).
+
+### Build Command
+
+The typical build command for this project is:
+```bash
+pnpm build
+```
+This command should be used by your hosting provider during the build step. The `vercel.json` file specifies this.
+
+### Supabase Setup for Production
+
+Before deploying the frontend, ensure your Supabase project is properly configured for production:
+
+1.  **Database Schema**: Apply all necessary database migrations to your production Supabase database to create tables for `users` (from Auth), `products`, `carts`, `cart_items`, `orders`, `order_items`, etc.
+2.  **Row Level Security (RLS)**: Implement and enable RLS policies on all tables to control data access. This is crucial for security.
+    -   Users should only be able to access their own carts, orders, etc.
+    -   Public data like products should be readable by everyone.
+    -   Edge Functions might operate with `service_role` privileges but should be written to respect user permissions where appropriate.
+3.  **Authentication**: Configure Supabase Auth settings, including providers (email/password, social logins), and email templates.
+4.  **Edge Functions**:
+    -   Deploy all necessary Supabase Edge Functions (e.g., `create-order`, `verify-razorpay-payment`, `send-order-confirmation-email`) using the Supabase CLI.
+    -   Set any required secrets for these functions (e.g., `RAZORPAY_KEY_SECRET`, email provider API keys) using `supabase secrets set`.
+5.  **Storage**: Configure Supabase Storage for product images or other assets if not using an external CDN. Ensure appropriate access policies are set up.
+
+### Vercel Specific Notes
+
+-   The included `vercel.json` specifies `pnpm build`. Vercel should automatically detect Next.js.
+-   The `outputDirectory: "out"` in `vercel.json` is typically for static exports (`next export`). For a standard dynamic Next.js deployment on Vercel, Vercel automatically uses the `.next` directory and this setting might not be needed or could even conflict if not a static export. If deploying a dynamic app, consider removing `outputDirectory` or ensuring your build process aligns. (Kept as per prompt for now).

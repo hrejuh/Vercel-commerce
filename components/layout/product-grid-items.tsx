@@ -1,9 +1,10 @@
 import Grid from 'components/grid';
 import { GridTileImage } from 'components/grid/tile';
-import { Product } from 'lib/shopify/types';
+// import { Product } from 'lib/shopify/types'; // Shopify type
+import { SupabaseProduct } from 'lib/supabase/products'; // Supabase type
 import Link from 'next/link';
 
-export default function ProductGridItems({ products }: { products: Product[] }) {
+export default function ProductGridItems({ products }: { products: SupabaseProduct[] }) { // Use SupabaseProduct[]
   return (
     <>
       {products.map((product) => (
@@ -14,13 +15,15 @@ export default function ProductGridItems({ products }: { products: Product[] }) 
             prefetch={true}
           >
             <GridTileImage
-              alt={product.title}
+              alt={product.name} // Use name from SupabaseProduct
               label={{
-                title: product.title,
-                amount: product.priceRange.maxVariantPrice.amount,
-                currencyCode: product.priceRange.maxVariantPrice.currencyCode
+                title: product.name, // Use name from SupabaseProduct
+                // Ensure priceRange exists or fallback to product.price
+                amount: product.priceRange?.maxVariantPrice?.amount || product.price.toString(),
+                currencyCode: product.priceRange?.maxVariantPrice?.currencyCode || 'USD'
               }}
-              src={product.featuredImage?.url}
+              // Ensure featuredImage exists or provide fallback
+              src={product.featuredImage?.url || ''}
               fill
               sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
             />

@@ -2,25 +2,29 @@
 
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { removeItem } from 'components/cart/actions';
-import type { CartItem } from 'lib/shopify/types';
+// import type { CartItem } from 'lib/shopify/types'; // Shopify type
+import type { SupabaseCartItem } from '@/lib/supabase/cart'; // Supabase type (ensure path is correct)
 import { useActionState } from 'react';
 
 export function DeleteItemButton({
   item,
   optimisticUpdate
 }: {
-  item: CartItem;
-  optimisticUpdate: any;
+  item: SupabaseCartItem; // Use SupabaseCartItem type
+  optimisticUpdate: any; // This function will need to be aware of SupabaseCartItem structure
 }) {
   const [message, formAction] = useActionState(removeItem, null);
-  const merchandiseId = item.merchandise.id;
-  const removeItemAction = formAction.bind(null, merchandiseId);
+  // The removeItem action now expects the cart_item_id directly.
+  // SupabaseCartItem has an 'id' field which is the cart_item_id.
+  const cartItemId = item.id;
+  const removeItemAction = formAction.bind(null, cartItemId);
 
   return (
     <form
       action={async () => {
-        optimisticUpdate(merchandiseId, 'delete');
-        removeItemAction();
+        // Ensure optimisticUpdate can handle cartItemId or the SupabaseCartItem structure
+        optimisticUpdate(cartItemId, 'delete');
+        await removeItemAction();
       }}
     >
       <button

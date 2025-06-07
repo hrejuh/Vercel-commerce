@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "next.config.ts",
+      "use": "@vercel/next",
+      "config": {
+        "buildCommand": "pnpm build",
+        "outputDirectory": "out"
+      }
+    }
+  ],
+  "env": {
+    "NODE_VERSION": "18.x"
+  }
+}

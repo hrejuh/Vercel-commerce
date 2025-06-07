@@ -3,17 +3,18 @@
 import { PlusIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { addItem } from 'components/cart/actions';
-import { useProduct } from 'components/product/product-context';
-import { Product, ProductVariant } from 'lib/shopify/types';
+// import { useProduct } from 'components/product/product-context'; // Variant selection context
+// import { Product, ProductVariant } from 'lib/shopify/types'; // Shopify types
+import { SupabaseProduct } from '@/lib/supabase/products'; // Supabase type (ensure path is correct)
 import { useActionState } from 'react';
-import { useCart } from './cart-context';
+// import { useCart } from './cart-context'; // Client-side cart context, may need update
 
 function SubmitButton({
   availableForSale,
-  selectedVariantId
+  productId // Changed from selectedVariantId
 }: {
   availableForSale: boolean;
-  selectedVariantId: string | undefined;
+  productId: string | undefined; // Product ID for Supabase
 }) {
   const buttonClasses =
     'relative flex w-full items-center justify-center rounded-full bg-blue-600 p-4 tracking-wide text-white';
@@ -27,10 +28,12 @@ function SubmitButton({
     );
   }
 
-  if (!selectedVariantId) {
+  // Simplified: if there's no productId (e.g. product itself is not loaded), disable.
+  // Variant specific logic removed for now.
+  if (!productId) {
     return (
       <button
-        aria-label="Please select an option"
+        aria-label="Product not available"
         disabled
         className={clsx(buttonClasses, disabledClasses)}
       >
@@ -57,34 +60,36 @@ function SubmitButton({
   );
 }
 
-export function AddToCart({ product }: { product: Product }) {
-  const { variants, availableForSale } = product;
-  const { addCartItem } = useCart();
-  const { state } = useProduct();
+export function AddToCart({ product }: { product: SupabaseProduct }) { // Use SupabaseProduct
+  // const { variants, availableForSale } = product; // availableForSale from SupabaseProduct
+  const availableForSale = product.availableForSale !== undefined ? product.availableForSale : (product.stock !== undefined ? product.stock > 0 : true);
+  // const { addCartItem } = useCart(); // Client context, handle later
+  // const { state } = useProduct(); // Variant selection context, removed for simplification
   const [message, formAction] = useActionState(addItem, null);
 
-  const variant = variants.find((variant: ProductVariant) =>
-    variant.selectedOptions.every(
-      (option) => option.value === state[option.name.toLowerCase()]
-    )
-  );
-  const defaultVariantId = variants.length === 1 ? variants[0]?.id : undefined;
-  const selectedVariantId = variant?.id || defaultVariantId;
-  const addItemAction = formAction.bind(null, selectedVariantId);
-  const finalVariant = variants.find(
-    (variant) => variant.id === selectedVariantId
-  )!;
+  // Simplified: using the main product ID. Variant logic is removed.
+  // In a full implementation, variant selection would need to be handled here
+  // and a productId (which could be a variant_id if your Supabase schema has variants as separate product entries)
+  // would be determined. For now, product.id is the SupabaseProduct's main ID.
+  const productId = product.id;
+
+  // Bind the productId to the server action
+  const addItemActionWithProductId = formAction.bind(null, productId);
 
   return (
     <form
       action={async () => {
-        addCartItem(finalVariant, product);
-        addItemAction();
+        // Client-side optimistic update logic via addCartItem would need adjustment
+        // For now, focusing on server action.
+        // if (finalVariant && product) { // finalVariant is no longer determined here
+        //   addCartItem(finalVariant, product); // This would need Supabase types
+        // }
+        await addItemActionWithProductId();
       }}
     >
       <SubmitButton
         availableForSale={availableForSale}
-        selectedVariantId={selectedVariantId}
+        productId={productId} // Pass productId
       />
       <p aria-live="polite" className="sr-only" role="status">
         {message}
