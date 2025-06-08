@@ -1,3 +1,5 @@
+// Shopify cart fragment, no longer used as cart functionality migrated to Supabase.
+/*
 import productFragment from './product';
 
 const cartFragment = /* GraphQL */ `
@@ -51,3 +53,5 @@ const cartFragment = /* GraphQL */ `
 `;
 
 export default cartFragment;
+*/
+export {}; // Ensure it's a module

@@ -18,9 +18,9 @@ import {
   editCartItemsMutation,
   removeFromCartMutation
 } from './mutations/cart';
-import { getCartQuery } from './queries/cart';
+// import { getCartQuery } from './queries/cart'; // Commented out
 import {
-  getCollectionProductsQuery,
+  getCollectionProductsQuery, // This is for product lists within collections, should eventually be removed too
   getCollectionQuery,
   getCollectionsQuery
 } from './queries/collection';
@@ -298,25 +298,25 @@ export async function updateCart(
   return reshapeCart(res.body.data.cartLinesUpdate.cart);
 }
 
-export async function getCart(): Promise<Cart | undefined> {
-  const cartId = (await cookies()).get('cartId')?.value;
-
-  if (!cartId) {
-    return undefined;
-  }
-
-  const res = await shopifyFetch<ShopifyCartOperation>({
-    query: getCartQuery,
-    variables: { cartId }
-  });
-
-  // Old carts becomes `null` when you checkout.
-  if (!res.body.data.cart) {
-    return undefined;
-  }
-
-  return reshapeCart(res.body.data.cart);
-}
+// export async function getCart(): Promise<Cart | undefined> {
+//   const cartId = (await cookies()).get('cartId')?.value;
+//
+//   if (!cartId) {
+//     return undefined;
+//   }
+//
+//   const res = await shopifyFetch<ShopifyCartOperation>({
+//     query: getCartQuery,
+//     variables: { cartId }
+//   });
+//
+//   // Old carts becomes `null` when you checkout.
+//   if (!res.body.data.cart) {
+//     return undefined;
+//   }
+//
+//   return reshapeCart(res.body.data.cart);
+// }
 
 export async function getCollection(
   handle: string
